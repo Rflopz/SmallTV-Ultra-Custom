@@ -10,9 +10,18 @@
 #define UTC_OFFSET -25200
 #define DST_OFFSET 0
 
+// Clipping variables for partial updates
+int16_t clipY_start = 0;
+int16_t clipY_end = 240;
+
 // Callback for TJpg_Decoder
 bool tft_output(int16_t x, int16_t y, uint16_t w, uint16_t h, uint16_t* bitmap) {
   if (y >= tft.height()) return 0;
+  
+  // Simple vertical clipping optimization
+  // If the block is completely outside our vertical range, skip drawing it.
+  if (y + h < clipY_start || y > clipY_end) return 1;
+
   tft.pushImage(x, y, w, h, bitmap);
   return 1;
 }
@@ -20,20 +29,13 @@ bool tft_output(int16_t x, int16_t y, uint16_t w, uint16_t h, uint16_t* bitmap) 
 void drawBackground() {
   if (LittleFS.exists("/background.jpg")) {
     File f = LittleFS.open("/background.jpg", "r");
-    Serial.print("Found background.jpg, size: ");
-    Serial.println(f.size());
     f.close();
 
-    Serial.println("Drawing background...");
     TJpgDec.setJpgScale(1);
     TJpgDec.setSwapBytes(true);
     TJpgDec.setCallback(tft_output);
-
-    uint16_t w = 0, h = 0;
-    // Use the *Fs* variants of the functions to pass the filesystem
-    TJpgDec.getFsJpgSize(&w, &h, "/background.jpg", LittleFS);
-    Serial.printf("JPG Size: %dx%d\n", w, h);
     
+    // Pass LittleFS as the last argument
     TJpgDec.drawFsJpg(0, 0, "/background.jpg", LittleFS);
   } else {
     Serial.println("No background.jpg found");
@@ -81,10 +83,19 @@ void drawClock() {
     if (p_tm->tm_min != lastMinute) {
       lastMinute = p_tm->tm_min;
 
-      // 1. Clear Screen (Redraw Background)
-      drawBackground();
+      // 1. Set Clipping Region (update only the middle strip: y=70 to 160)
+      // This makes the redraw much faster and less noticeable
+      clipY_start = 70;
+      clipY_end = 160;
 
-      // 2. Draw Time (Transparent)
+      // 2. Redraw Background (Partial)
+      drawBackground();
+      
+      // Reset clipping for other potential draws
+      clipY_start = 0;
+      clipY_end = 240;
+
+      // 3. Draw Time (Transparent)
       tft.setTextColor(timeColor); // Transparent
       tft.setTextSize(5);
       
