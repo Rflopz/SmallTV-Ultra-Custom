@@ -1,8 +1,8 @@
-#include <Arduino.h>
-#include "Globals.h"
-#include "WifiManager.h"
-#include "WebManager.h"
 #include "DisplayManager.h"
+#include "Globals.h"
+#include "WebManager.h"
+#include "WifiManager.h"
+#include <Arduino.h>
 
 void setup() {
   Serial.begin(115200);
@@ -27,5 +27,5 @@ void setup() {
 
 void loop() {
   loopWeb();
-  drawClock();
+  loopDisplay();
 }

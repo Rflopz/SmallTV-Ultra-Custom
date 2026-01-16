@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SmallTV Config</title>
+    <script src='https://unpkg.com/omggif@1.0.10/omggif.js'></script>
+    <script>
+        function u() {
+            var f = document.getElementById('f').files[0];
+            if (!f) return;
+
+            var r = new FileReader();
+            r.onload = function(e) {
+                var u8 = new Uint8Array(e.target.result);
+                if (u8[0] != 71 || u8[1] != 73 || u8[2] != 70) {
+                    alert('Not a GIF');
+                    return;
+                }
+
+                if (typeof omggif === 'undefined') {
+                    alert('omggif lib not loaded! Check internet.');
+                    return;
+                }
+                var gr = new omggif.GifReader(u8);
+                var frameCount = gr.numFrames();
+                console.log('Frames:', frameCount);
+                alert('Converting ' + frameCount + ' frames (omggif)...');
+
+                var canvas = document.createElement('canvas');
+                canvas.width = 240;
+                canvas.height = 240;
+                var ctx = canvas.getContext('2d');
+
+                var tmpCan = document.createElement('canvas');
+                tmpCan.width = gr.width;
+                tmpCan.height = gr.height;
+                var tmpCtx = tmpCan.getContext('2d');
+                var imgData = tmpCtx.createImageData(gr.width, gr.height);
+
+                var chunks = [];
+
+                function processFrame(i) {
+                    if (i >= frameCount) {
+                        finish();
+                        return;
+                    }
+
+                    gr.decodeAndBlitFrameRGBA(i, imgData.data);
+                    tmpCtx.putImageData(imgData, 0, 0);
+
+                    ctx.fillStyle = 'black';
+                    ctx.fillRect(0, 0, 240, 240);
+                    ctx.drawImage(tmpCan, 0, 0, 240, 240);
+
+                    canvas.toBlob(function(blob) {
+                        blob.arrayBuffer().then(function(buf) {
+                            var u8b = new Uint8Array(buf);
+                            var len = u8b.length;
+                            var header = new Uint8Array(4);
+                            header[0] = len & 0xFF;
+                            header[1] = (len >> 8) & 0xFF;
+                            header[2] = (len >> 16) & 0xFF;
+                            header[3] = (len >> 24) & 0xFF;
+
+                            chunks.push(header);
+                            chunks.push(u8b);
+
+                            setTimeout(function() {
+                                processFrame(i + 1);
+                            }, 5);
+                        });
+                    }, 'image/jpeg', 0.6);
+                }
+
+                function finish() {
+                    var blob = new Blob(chunks, {
+                        type: 'application/octet-stream'
+                    });
+                    console.log('Final Size:', blob.size);
+                    var d = new FormData();
+                    d.append('f', blob, 'anim.mjpeg');
+                    var xh = new XMLHttpRequest();
+                    xh.open('POST', '/upload');
+                    xh.send(d);
+                    xh.onload = function() {
+                        alert('Uploaded! Rebooting...');
+                        location.reload();
+                    };
+                }
+
+                processFrame(0);
+            };
+            r.readAsArrayBuffer(f);
+        }
+    </script>
+</head>
+<body>
+    <h1>SmallTV Ultra</h1>
+    <h3>System Info</h3>
+    <p>Heap: %HEAP% KB</p>
+    <p>Flash: %FLASH% KB</p>
+
+    <h3>Settings</h3>
+    <form action='/set' method='POST'>
+        Time Color: <input type='color' name='c' value='%COLOR%'><br><br>
+        <input type='submit' value='Save Settings'>
+    </form>
+
+    <h3>Background Image</h3>
+    <input type='file' id='f' accept='image/*'><br><br>
+    <button onclick='u()'>Upload & Resize</button>
+</body>
+</html>

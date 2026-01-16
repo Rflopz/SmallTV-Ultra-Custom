@@ -4,5 +4,6 @@
 void setupDisplay();
 void drawBackground();
 void drawClock();
+void loopDisplay();
 
 #endif
